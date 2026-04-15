@@ -2,6 +2,11 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Custom styles for Ladakh 2026 Trip Site */
+body {
+  font-family: 'Inter', sans-serif;
+}
+
 *, *::before, *::after {
   margin: 0;
   padding: 0;
