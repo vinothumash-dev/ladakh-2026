@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
+import ZANSKAR_GPX from "./zanskar-gpx.js";
 import {
   Mountain, MapPin, Moon, Star, AlertTriangle, Fuel, Wifi, Heart,
   ChevronDown, Route, ArrowUpDown, Navigation, Shield, Compass,
@@ -21,7 +22,7 @@ const THEMES = {
 const PHOTOS = {
   "sahyadri-2023": {
     "Gokarna": [
-      { file: "1.JPG", caption: "Murudeshwar Temple" },
+      { file: "1.jpg", caption: "Murudeshwar Temple" },
     ],
     "Goa": [
       { file: "2.jpg", caption: "Butterfly Beach" },
@@ -30,12 +31,12 @@ const PHOTOS = {
       { file: "3.jpg", caption: "Amboli Waterfalls" },
     ],
     "Mahad": [
-      { file: "4.JPG", caption: "Mahabaleshwar viewpoint" },
+      { file: "4.jpg", caption: "Mahabaleshwar viewpoint" },
     ],
     "Bhagad": [
-      { file: "5.JPG", caption: "Nanemachi Waterfalls" },
-      { file: "6.png", caption: "Kumbhe Waterfalls" },
-      { file: "7.JPG", caption: "Devkund Waterfalls" },
+      { file: "5.jpg", caption: "Nanemachi Waterfalls" },
+      { file: "6.jpg", caption: "Kumbhe Waterfalls" },
+      { file: "7.jpg", caption: "Devkund Waterfalls" },
     ],
   },
   "sahyadri-2024": {
@@ -64,21 +65,21 @@ const PHOTOS = {
   "zanskar-2025": {
     "Kargil": [
       { file: "1.jpg",  caption: "Sonamarg (en route)" },
-      { file: "2.JPG",  caption: "Dras Valley" },
+      { file: "2.JPg",  caption: "Dras Valley" },
     ],
     "Leh": [
       { file: "3.jpg",  caption: "Leh" },
-      { file: "4.JPG",  caption: "Lamayuru · Padum (en route)" },
     ],
     "Padum": [
+      { file: "4.JPg",  caption: "Lamayuru · Padum (en route)" },
       { file: "5.jpg",  caption: "Sir Sir La" },
       { file: "6.jpg",  caption: "Singe La" },
       { file: "7.jpg",  caption: "Padum" },
+      { file: "10.png", caption: "Gonbo Rangjon" },
     ],
     "Tandi": [
       { file: "8.jpg",  caption: "Padum · Darcha (en route)" },
       { file: "9.jpg",  caption: "Shinku La" },
-      { file: "10.png", caption: "Gonbo Rangjon" },
       { file: "11.jpg", caption: "Tandi" },
     ],
     "Kaza": [
@@ -89,16 +90,16 @@ const PHOTOS = {
     ],
     "Losar": [
       { file: "18.jpg", caption: "Losar" },
-      { file: "15.jpg",  caption: "Chenab River" },
-      { file: "16.jpg",  caption: "Chenab River" }
     ],
     "Hudan Bhatori": [
+      { file: "15.jpg",  caption: "Chenab River" },
+      { file: "16.jpg",  caption: "Chenab River" },
       { file: "19.jpg",  caption: "Rashil" },
       { file: "20.jpg",  caption: "Hudan Bhatori" },
       { file: "21.jpeg", caption: "Hudan Bhatori" },
+      { file: "22.jpg",  caption: "Pangi Valley" },
     ],
     "Kishtwar": [
-      { file: "22.jpg",  caption: "Pangi Valley" },
       { file: "23.jpg", caption: "Kishtwar" },
     ],
     "Srinagar": [
@@ -901,6 +902,286 @@ function ZanskarStop({ stop, color, bg, border }) {
   );
 }
 
+// ─── ZANSKAR MAP STOPS ────────────────────────────────────────────────────────
+// Correct chronological order: Srinagar → Kargil → Leh → Padum → Tandi → Losar → Kaza → Hudan Bhatori → Kishtwar → Srinagar
+// GPX indices from new GPX file (sampled every 38th point → 1,285 coords)
+const ZANSKAR_MAP_STOPS = [
+  { num:"S",  name:"Srinagar",      nights:"Start", lat:34.084, lng:74.797, gpxIdx:0,    ele:"1,585 m", valley:"Kashmir Valley",  passes:[], visited:["Dal Lake","Srinagar city"],              photos:[{f:"24.JPG",c:"Srinagar"}] },
+  { num:"01", name:"Kargil",        nights:"1N",    lat:34.558, lng:76.124, gpxIdx:110,  ele:"2,676 m", valley:"Suru Valley",     passes:[], visited:["Sonamarg (en route)","Dras Valley"],     photos:[{f:"1.jpg",c:"Sonamarg"},{f:"2.JPg",c:"Dras Valley"}] },
+  { num:"02", name:"Leh",           nights:"1N",    lat:34.152, lng:77.576, gpxIdx:268,  ele:"3,524 m", valley:"Indus Valley",    passes:[], visited:["Leh Palace","Shanti Stupa","Indus Valley"], photos:[{f:"3.jpg",c:"Leh"}] },
+  { num:"03", name:"Padum",         nights:"2N",    lat:33.462, lng:76.932, gpxIdx:464,  ele:"3,657 m", valley:"Zanskar Valley",  passes:[{n:"Sir Sir La",a:"4,800 m"},{n:"Singe La",a:"5,059 m"}], visited:["Lamayuru (en route)","Sir Sir La","Singe La","Padum","Gonbo Rangjon"], photos:[{f:"4.JPg",c:"Lamayuru"},{f:"5.jpg",c:"Sir Sir La"},{f:"6.jpg",c:"Singe La"},{f:"7.jpg",c:"Padum"},{f:"10.png",c:"Gonbo Rangjon"}] },
+  { num:"04", name:"Tandi",         nights:"1N",    lat:32.534, lng:76.967, gpxIdx:605,  ele:"2,594 m", valley:"Lahaul Valley",   passes:[{n:"Shinku La",a:"5,091 m"}], visited:["Shinku La","Padum-Darcha","Tandi"], photos:[{f:"8.jpg",c:"Padum-Darcha"},{f:"9.jpg",c:"Shinku La"},{f:"11.jpg",c:"Tandi"}] },
+  { num:"05", name:"Losar",         nights:"1N",    lat:32.440, lng:77.748, gpxIdx:704,  ele:"4,079 m", valley:"Upper Spiti",     passes:[{n:"Kunzum La",a:"4,590 m"}], visited:["Losar village"], photos:[{f:"18.jpg",c:"Losar"}] },
+  { num:"06", name:"Kaza",          nights:"2N",    lat:32.229, lng:78.067, gpxIdx:737,  ele:"3,800 m", valley:"Spiti Valley",    passes:[], visited:["Keylong (en route)","Spiti River","Spiti Valley","Chicham Bridge"], photos:[{f:"12.jpg",c:"Keylong"},{f:"13.jpg",c:"Spiti River"},{f:"14.jpg",c:"Spiti Valley"},{f:"17.jpg",c:"Chicham Bridge"}] },
+  { num:"07", name:"Hudan Bhatori", nights:"1N",    lat:32.880, lng:76.470, gpxIdx:938,  ele:"~2,200 m",valley:"Pangi Valley",   passes:[], visited:["Rashil","Chenab River","Pangi Valley","Hudan Bhatori"], photos:[{f:"15.jpg",c:"Chenab River"},{f:"16.jpg",c:"Chenab River"},{f:"19.jpg",c:"Rashil"},{f:"20.jpg",c:"Hudan Bhatori"},{f:"21.jpeg",c:"Hudan Bhatori"},{f:"22.jpg",c:"Pangi Valley"}] },
+  { num:"08", name:"Kishtwar",      nights:"1N",    lat:33.313, lng:75.773, gpxIdx:1029, ele:"1,672 m", valley:"Chenab Valley",   passes:[], visited:["Kishtwar town"], photos:[{f:"23.jpg",c:"Kishtwar"}] },
+  { num:"E",  name:"Srinagar",      nights:"End",   lat:34.065, lng:74.790, gpxIdx:1284, ele:"1,585 m", valley:"Kashmir Valley",  passes:[], visited:["Journey complete"], photos:[] },
+];
+
+// Pre-compute route slices once at module level for performance
+const ROUTE_SLICES = ZANSKAR_MAP_STOPS.map(s => ZANSKAR_GPX.slice(0, s.gpxIdx + 1));
+
+// ─── ZANSKAR MAP SECTION ──────────────────────────────────────────────────────
+function ZanskarMapSection({ color }) {
+  const wrapRef    = useRef(null);
+  const mapElRef   = useRef(null);
+  const lmapRef    = useRef(null);
+  const routeRef   = useRef(null);
+  const stopIdxRef = useRef(0);
+  const wheelAccRef= useRef(0);
+  const inViewRef  = useRef(false);
+
+  // All dynamic card/dot data lives in React state — avoids DOM-vs-React opacity conflict
+  const [cardData, setCardData] = useState(null); // {stop, dotX, dotY, cardX, cardY}
+  const [lbSrc, setLbSrc] = useState(null);
+
+  const basePath = `${import.meta.env.BASE_URL}images/zanskar-2025/`;
+
+  function updateForStop(si) {
+    const L = window.L;
+    if (!L || !lmapRef.current || !mapElRef.current) return;
+    const stop = ZANSKAR_MAP_STOPS[si];
+    if (!stop) return;
+
+    routeRef.current.setLatLngs(ROUTE_SLICES[si]);
+
+    const px  = lmapRef.current.latLngToContainerPoint([stop.lat, stop.lng]);
+    const mapW = mapElRef.current.offsetWidth;
+    const mapH = mapElRef.current.offsetHeight;
+
+    const cardW = 300;
+    const GAP   = 26;
+    const onLeft = px.x > mapW / 2;
+    const cx = onLeft ? px.x - GAP - cardW : px.x + GAP;
+    const cy = Math.min(Math.max(px.y - 100, 60), mapH - 310);
+
+    setCardData({ stop, dotX: px.x, dotY: px.y, cardX: cx, cardY: cy });
+  }
+
+  // ── Map init ──────────────────────────────────────────────────────────────
+  useEffect(() => {
+    let mounted = true;
+
+    function initMap() {
+      if (!mounted || lmapRef.current || !mapElRef.current) return;
+      const L = window.L;
+      const m = L.map(mapElRef.current, {
+        zoomControl: false, attributionControl: false,
+        dragging: false, scrollWheelZoom: false,
+        doubleClickZoom: false, touchZoom: false, keyboard: false,
+      });
+      L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", { maxZoom: 19 }).addTo(m);
+      m.fitBounds(L.polyline(ZANSKAR_GPX).getBounds(), { padding: [55, 55] });
+      L.polyline(ZANSKAR_GPX, { color, weight: 2, opacity: 0.18, dashArray: "5,4" }).addTo(m);
+      routeRef.current = L.polyline([], { color, weight: 3.5, opacity: 0.9 }).addTo(m);
+      ZANSKAR_MAP_STOPS.forEach((s, i) => {
+        const isEnd = i === 0 || i === ZANSKAR_MAP_STOPS.length - 1;
+        L.circleMarker([s.lat, s.lng], {
+          radius: isEnd ? 6 : 5, color: "#fff", weight: 1.5,
+          fillColor: isEnd ? "#e11d48" : color, fillOpacity: 1,
+        }).addTo(m);
+      });
+      lmapRef.current = m;
+      stopIdxRef.current = 0;
+      setTimeout(() => { if (mounted) updateForStop(0); }, 350);
+    }
+
+    if (window.L) {
+      initMap();
+    } else {
+      if (!document.getElementById("leaflet-css")) {
+        const link = document.createElement("link");
+        link.id = "leaflet-css"; link.rel = "stylesheet";
+        link.href = "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css";
+        document.head.appendChild(link);
+      }
+      const script = document.createElement("script");
+      script.src = "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js";
+      script.onload = initMap;
+      document.head.appendChild(script);
+    }
+
+    return () => { mounted = false; };
+  }, []);
+
+  // ── Wheel hijacking — 2 ticks per stop ────────────────────────────────────
+  useEffect(() => {
+    const el = wrapRef.current;
+    if (!el) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => { inViewRef.current = entry.intersectionRatio >= 0.5; },
+      { threshold: [0, 0.5, 1] }
+    );
+    observer.observe(el);
+
+    const onWheel = (e) => {
+      if (!inViewRef.current || !lmapRef.current) return;
+      const dir = e.deltaY > 0 ? 1 : -1;
+      const si  = stopIdxRef.current;
+      // At boundaries → let page scroll naturally
+      if (dir > 0 && si >= ZANSKAR_MAP_STOPS.length - 1) return;
+      if (dir < 0 && si <= 0) return;
+
+      e.preventDefault();
+      wheelAccRef.current += dir;
+
+      if (Math.abs(wheelAccRef.current) >= 2) {
+        const newSi = Math.max(0, Math.min(ZANSKAR_MAP_STOPS.length - 1, si + (wheelAccRef.current > 0 ? 1 : -1)));
+        wheelAccRef.current = 0;
+        stopIdxRef.current  = newSi;
+        updateForStop(newSi);
+      }
+    };
+
+    window.addEventListener("wheel", onWheel, { passive: false });
+    return () => {
+      window.removeEventListener("wheel", onWheel);
+      observer.disconnect();
+    };
+  }, []);
+
+  const TOTAL = ZANSKAR_MAP_STOPS.length;
+
+  return (
+    <>
+      <style>{`
+        @keyframes mapBob{0%{transform:rotate(45deg) translateY(-2px)}100%{transform:rotate(45deg) translateY(3px)}}
+        @keyframes dotPulse{0%,100%{box-shadow:0 0 0 5px ${color}33,0 0 18px ${color}99}50%{box-shadow:0 0 0 9px ${color}1a,0 0 30px ${color}66}}
+      `}</style>
+
+      {/* Wrapper — 100 vh block; wheel events trapped while navigating stops */}
+      <div ref={wrapRef} style={{ position: "relative", height: "100vh", overflow: "hidden", background: "#0b0e15" }}>
+
+        {/* Leaflet map */}
+        <div ref={mapElRef} style={{ width: "100%", height: "100%" }} />
+
+        {/* Glowing dot at current stop */}
+        {cardData && (
+          <div style={{
+            position: "absolute", zIndex: 10,
+            width: 16, height: 16, borderRadius: "50%",
+            background: color, border: "2.5px solid #fff",
+            animation: "dotPulse 2s ease infinite",
+            transform: "translate(-50%,-50%)",
+            transition: "left .45s cubic-bezier(.4,0,.2,1), top .45s cubic-bezier(.4,0,.2,1)",
+            pointerEvents: "none",
+            left: cardData.dotX, top: cardData.dotY,
+          }} />
+        )}
+
+        {/* Stop name label just below dot */}
+        {cardData && (
+          <div style={{
+            position: "absolute", zIndex: 12,
+            left: cardData.dotX, top: cardData.dotY + 13,
+            transform: "translateX(-50%)",
+            fontSize: 11, fontWeight: 700, color: "#f0f0f0",
+            textShadow: "0 1px 6px rgba(0,0,0,0.95)",
+            background: "rgba(0,0,0,0.58)",
+            padding: "2px 8px", borderRadius: 99,
+            whiteSpace: "nowrap", pointerEvents: "none",
+            transition: "left .45s cubic-bezier(.4,0,.2,1), top .45s cubic-bezier(.4,0,.2,1)",
+          }}>
+            {cardData.stop.name}
+          </div>
+        )}
+
+        {/* Info card — all positioning via React state, so opacity is never overridden */}
+        {cardData && (
+          <div style={{
+            position: "absolute", zIndex: 20, width: 300,
+            background: "rgba(12,14,24,0.86)",
+            border: `1px solid rgba(124,58,237,0.4)`,
+            borderRadius: 14,
+            left: cardData.cardX, top: cardData.cardY,
+            transition: "left .45s cubic-bezier(.4,0,.2,1), top .45s cubic-bezier(.4,0,.2,1), opacity .3s",
+            opacity: 1,
+            boxShadow: "0 8px 32px rgba(0,0,0,0.65)",
+          }}>
+            {/* Header */}
+            <div style={{ padding: "12px 14px 10px", borderBottom: "1px solid #1e2230", display: "flex", alignItems: "center", gap: 9 }}>
+              <span style={{ fontSize: 22, fontWeight: 800, color, lineHeight: 1, minWidth: 30 }}>{cardData.stop.num}</span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 15, fontWeight: 700, color: "#f1f1f1" }}>{cardData.stop.name}</div>
+                <div style={{ fontSize: 10, color: "#475569", marginTop: 1 }}>{cardData.stop.ele} · {cardData.stop.valley}</div>
+              </div>
+              <span style={{ fontSize: 10, padding: "2px 9px", borderRadius: 99, background: `${color}18`, color, border: `1px solid ${color}33`, flexShrink: 0 }}>{cardData.stop.nights}</span>
+            </div>
+            {/* Body */}
+            <div style={{ padding: "10px 14px 12px", display: "flex", flexDirection: "column", gap: 8 }}>
+              {cardData.stop.passes?.length > 0 && (
+                <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
+                  <span style={{ fontSize: 14 }}>⛰️</span>
+                  <div>
+                    <div style={{ fontSize: 9, textTransform: "uppercase", letterSpacing: ".12em", color, marginBottom: 4 }}>Passes</div>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                      {cardData.stop.passes.map(p => (
+                        <span key={p.n} style={{ fontSize: 10, padding: "2px 8px", borderRadius: 99, color: "#94a3b8", border: "1px solid #2a2e3d" }}>{p.n} · {p.a}</span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+              {cardData.stop.visited?.length > 0 && (
+                <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
+                  <span style={{ fontSize: 14 }}>📍</span>
+                  <div>
+                    <div style={{ fontSize: 9, textTransform: "uppercase", letterSpacing: ".12em", color, marginBottom: 4 }}>Visited</div>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                      {cardData.stop.visited.map(v => (
+                        <span key={v} style={{ fontSize: 10, padding: "2px 8px", borderRadius: 99, background: `${color}12`, color, border: `1px solid ${color}2e` }}>{v}</span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+              {/* Photo thumbnails inside card */}
+              {cardData.stop.photos?.length > 0 && (
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 2 }}>
+                  {cardData.stop.photos.slice(0, 5).map((p, i) => (
+                    <div key={p.f + i} onClick={() => setLbSrc({ src: basePath + p.f, cap: p.c })}
+                      style={{ width: 46, height: 46, borderRadius: "50%", overflow: "hidden", border: `2px solid ${color}88`, cursor: "pointer", boxShadow: "0 3px 12px rgba(0,0,0,0.7)", flexShrink: 0 }}>
+                      <img src={basePath + p.f} alt={p.c} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Progress pill — stop counter */}
+        {cardData && (
+          <div style={{ position: "absolute", bottom: 18, left: "50%", transform: "translateX(-50%)", zIndex: 20, display: "flex", alignItems: "center", gap: 8, fontSize: 11, color: "#64748b", background: "rgba(15,17,23,0.85)", padding: "5px 16px", borderRadius: 99, border: "1px solid #1e2230", whiteSpace: "nowrap" }}>
+            <span style={{ color, fontWeight: 700 }}>{stopIdxRef.current + 1}</span>
+            <span>/</span>
+            <span>{TOTAL}</span>
+            <span style={{ width: 1, height: 10, background: "#1e2230", display: "inline-block" }} />
+            <span style={{ color: "#94a3b8" }}>{cardData.stop.name}</span>
+          </div>
+        )}
+
+        {/* Scroll hint — visible only at first stop */}
+        <div style={{ position: "absolute", bottom: 52, left: "50%", transform: "translateX(-50%)", zIndex: 20, textAlign: "center", pointerEvents: "none", opacity: cardData?.stop.num === "S" ? 1 : 0, transition: "opacity .5s" }}>
+          <div style={{ fontSize: 10, letterSpacing: ".25em", textTransform: "uppercase", color: "#475569", marginBottom: 6 }}>Scroll to travel</div>
+          <div style={{ width: 14, height: 14, borderRight: "2px solid #475569", borderBottom: "2px solid #475569", transform: "rotate(45deg)", margin: "0 auto", animation: "mapBob .8s ease infinite alternate" }} />
+        </div>
+      </div>
+
+      {/* Lightbox */}
+      {lbSrc && createPortal(
+        <div onClick={() => setLbSrc(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.92)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", cursor: "zoom-out" }}>
+          <button onClick={() => setLbSrc(null)} style={{ position: "absolute", top: 18, right: 22, background: "none", border: "none", color: "#fff", fontSize: 26, cursor: "pointer", opacity: .6 }}>✕</button>
+          <img src={lbSrc.src} alt={lbSrc.cap} onClick={e => e.stopPropagation()} style={{ maxWidth: "90vw", maxHeight: "88vh", borderRadius: 12, objectFit: "contain" }} />
+          <div style={{ position: "absolute", bottom: 22, left: "50%", transform: "translateX(-50%)", fontSize: 12, color: "#94a3b8", background: "rgba(15,17,23,0.85)", padding: "5px 16px", borderRadius: 99, whiteSpace: "nowrap" }}>{lbSrc.cap}</div>
+        </div>,
+        document.body
+      )}
+    </>
+  );
+}
+
 function ZanskarSection() {
   const d = ZANSKAR_2025;
   const { accent: color, bg, border } = THEMES["zanskar-2025"];
@@ -926,15 +1207,7 @@ function ZanskarSection() {
           </Reveal>
         </div>
       </div>
-      <div className="w-full py-16 px-4" style={{ background: "#0b0e15" }}>
-        <div className="max-w-2xl mx-auto">
-          <Reveal className="mb-10"><SLabel color={color}>Itinerary</SLabel><h3 className="text-2xl font-bold" style={{ color: "#f1f1f1" }}>Stop by Stop</h3></Reveal>
-          <div className="relative">
-            <div className="absolute left-2 md:left-6 top-0 bottom-0 w-px" style={{ background: `linear-gradient(180deg,${color}00,${color},${color},${color}00)` }} />
-            {d.stops.map(s => <ZanskarStop key={s.num} stop={s} color={color} bg={bg} border={border} />)}
-          </div>
-        </div>
-      </div>
+      <ZanskarMapSection color={color} />
       <div className="w-full py-16 px-4" style={{ background: "#0f1117" }}>
         <div className="max-w-4xl mx-auto">
           <Reveal className="mb-10"><SLabel color={color}>High Altitude</SLabel><h3 className="text-2xl font-bold" style={{ color: "#f1f1f1" }}>5 Passes Crossed</h3></Reveal>
