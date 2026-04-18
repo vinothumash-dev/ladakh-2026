@@ -1379,13 +1379,13 @@ function ZanskarSection() {
   const [view, setView] = useState("timeline");
   const mapWrapRef = useRef(null);
 
-  // When switching TO map, scroll so the map fills the viewport (route fully visible)
+  // When switching TO map, snap instantly into position so getBoundingClientRect()
+  // in updateForStop(0) sees the correct coords (smooth scroll races with it).
   useEffect(() => {
     if (view === "map" && mapWrapRef.current) {
-      // Small delay lets the map DOM mount before scrolling
       const t = setTimeout(() => {
-        mapWrapRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-      }, 80);
+        mapWrapRef.current?.scrollIntoView({ behavior: "instant", block: "start" });
+      }, 30);
       return () => clearTimeout(t);
     }
   }, [view]);
@@ -1415,8 +1415,8 @@ function ZanskarSection() {
         </div>
       </div>
 
-      {/* ── Map / Timeline toggle ── */}
-      <div className="w-full py-4 px-4" style={{ background: "#0f1117", borderTop: "1px solid #1e2230" }}>
+      {/* ── Map / Timeline toggle — desktop only ── */}
+      <div className="hidden md:block w-full py-4 px-4" style={{ background: "#0f1117", borderTop: "1px solid #1e2230" }}>
         <div className="max-w-4xl mx-auto flex justify-center">
           <div className="inline-flex rounded-xl overflow-hidden" style={{ border: `1px solid ${border}`, background: "#181b25" }}>
             {[["timeline","☰  Timeline"],["map","🗺  Map"]].map(([key, label]) => (
@@ -1434,9 +1434,9 @@ function ZanskarSection() {
         </div>
       </div>
 
-      {/* ── Map view — ref used to auto-scroll into position on toggle ── */}
+      {/* ── Map view — desktop only, ref used to auto-scroll into position on toggle ── */}
       {view === "map" && (
-        <div ref={mapWrapRef}>
+        <div ref={mapWrapRef} className="hidden md:block">
           <ZanskarMapSection color={color} />
         </div>
       )}
