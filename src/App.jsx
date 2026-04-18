@@ -935,6 +935,8 @@ function ZanskarMapSection({ color }) {
   const inViewRef   = useRef(false);
   const txRef       = useRef(0);       // touch start X
   const moveEndRef  = useRef(null);    // cleanup handle for flyTo moveend listener
+  const mapReadyRef = useRef(false);   // true once the first flyTo completes
+  const exitAccRef  = useRef(0);       // counts scroll events at map edges before releasing page
 
   // React state: content + opacity only. left/top set via DOM refs (never in JSX style).
   const [activeStop, setActiveStop]   = useState(null);
@@ -968,6 +970,7 @@ function ZanskarMapSection({ color }) {
     // Called once the map has settled at the new position
     const onMoveEnd = () => {
       moveEndRef.current = null;
+      mapReadyRef.current = true; // unlock scroll navigation
       if (!lmapRef.current || !mapElRef.current) return;
 
       // Container-local → viewport-absolute (needed for position:fixed overlays)
@@ -998,8 +1001,8 @@ function ZanskarMapSection({ color }) {
     moveEndRef.current = onMoveEnd;
     lmapRef.current.once('moveend', onMoveEnd);
 
-    // FPV camera: fly to this stop at zoom 9
-    lmapRef.current.flyTo([stop.lat, stop.lng], 9, { duration: 0.8, easeLinearity: 0.5 });
+    // FPV camera: fly to this stop at zoom 11 (immersive ground-level detail)
+    lmapRef.current.flyTo([stop.lat, stop.lng], 11, { duration: 0.55, easeLinearity: 0.6 });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Map init ──────────────────────────────────────────────────────────────
@@ -1009,6 +1012,8 @@ function ZanskarMapSection({ color }) {
     function go() {
       stopIdxRef.current  = 0;
       wheelAccRef.current = 0;
+      exitAccRef.current  = 0;
+      mapReadyRef.current = false; // block scroll until first flyTo lands
       clearTimeout(timer);
       timer = setTimeout(() => updateForStop(0), 400);
     }
@@ -1028,6 +1033,7 @@ function ZanskarMapSection({ color }) {
         zoomControl: false, attributionControl: false,
         dragging: false, scrollWheelZoom: false,
         doubleClickZoom: false, touchZoom: false, keyboard: false,
+        preferCanvas: true,   // Canvas renderer — much faster for large polylines
       });
       // dark_nolabels (no graticule grid lines) + dark_only_labels (place names) stacked
       L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png",    { maxZoom: 19 }).addTo(m);
@@ -1088,14 +1094,29 @@ function ZanskarMapSection({ color }) {
     observer.observe(el);
 
     const onWheel = (e) => {
-      if (!inViewRef.current || !lmapRef.current) return;
-      const dir = e.deltaY > 0 ? 1 : -1;
-      const si  = stopIdxRef.current;
-      if (dir > 0 && si >= ZANSKAR_MAP_STOPS.length - 1) return;
-      if (dir < 0 && si <= 0) return;
+      // Block scroll until map is visible AND the first flyTo has landed
+      if (!inViewRef.current || !lmapRef.current || !mapReadyRef.current) return;
+
+      const dir    = e.deltaY > 0 ? 1 : -1;
+      const si     = stopIdxRef.current;
+      const atLast  = dir > 0 && si >= ZANSKAR_MAP_STOPS.length - 1;
+      const atFirst = dir < 0 && si <= 0;
+
+      if (atLast || atFirst) {
+        // Buffer 5 scroll events at the edge before releasing page scroll
+        exitAccRef.current += 1;
+        if (exitAccRef.current <= 5) {
+          e.preventDefault(); // still trap – user must scroll 5× more to leave
+          return;
+        }
+        exitAccRef.current = 0; // reset; let page scroll naturally this time
+        return;
+      }
+
+      exitAccRef.current = 0; // moved away from edge – reset exit counter
       e.preventDefault();
       wheelAccRef.current += dir;
-      if (Math.abs(wheelAccRef.current) >= 2) {
+      if (Math.abs(wheelAccRef.current) >= 3) { // 3 scroll events per stop
         const newSi = Math.max(0, Math.min(ZANSKAR_MAP_STOPS.length - 1, si + (wheelAccRef.current > 0 ? 1 : -1)));
         wheelAccRef.current = 0;
         stopIdxRef.current  = newSi;
@@ -1105,6 +1126,7 @@ function ZanskarMapSection({ color }) {
 
     const onTouchStart = (e) => { txRef.current = e.touches[0].clientX; };
     const onTouchEnd   = (e) => {
+      if (!mapReadyRef.current) return;
       const dx = e.changedTouches[0].clientX - txRef.current;
       if (Math.abs(dx) < 40) return;
       const dir   = dx < 0 ? 1 : -1;
@@ -1222,7 +1244,7 @@ function ZanskarMapSection({ color }) {
                     {activeStop.photos.slice(0, 5).map((p, i) => (
                       <div key={p.f + i} onClick={() => setLbSrc({ src: basePath + p.f, cap: p.c })}
                         style={{ width: 46, height: 46, borderRadius: "50%", overflow: "hidden", border: `2px solid ${color}88`, cursor: "pointer", boxShadow: "0 3px 12px rgba(0,0,0,0.7)", flexShrink: 0 }}>
-                        <img src={basePath + p.f} alt={p.c} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                        <img src={basePath + p.f} alt={p.c} loading="lazy" decoding="async" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
                       </div>
                     ))}
                   </div>
