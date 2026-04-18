@@ -921,6 +921,15 @@ const ZANSKAR_MAP_STOPS = [
 // Pre-compute route slices once at module level for performance
 const ROUTE_SLICES = ZANSKAR_MAP_STOPS.map(s => ZANSKAR_GPX.slice(0, s.gpxIdx + 1));
 
+// ─── HIGH PASSES (nearest GPX point to actual summit) ────────────────────────
+const ZANSKAR_PASSES = [
+  { name: "Zojila Pass", alt: "3,528 m", gpxIdx: 56,  lat: 34.28137, lng: 75.471   },
+  { name: "Sir Sir La",  alt: "4,800 m", gpxIdx: 424, lat: 33.89771, lng: 76.84444 },
+  { name: "Singe La",    alt: "5,059 m", gpxIdx: 446, lat: 33.74393, lng: 76.85684 },
+  { name: "Shinku La",   alt: "5,091 m", gpxIdx: 518, lat: 33.17812, lng: 77.17328 },
+  { name: "Kunzum La",   alt: "4,590 m", gpxIdx: 693, lat: 32.42308, lng: 77.65755 },
+];
+
 // ─── ZANSKAR MAP SECTION ──────────────────────────────────────────────────────
 function ZanskarMapSection({ color }) {
   const wrapRef     = useRef(null);
@@ -937,6 +946,7 @@ function ZanskarMapSection({ color }) {
   const moveEndRef  = useRef(null);    // unused (kept for future use)
   const mapReadyRef = useRef(false);   // true once the first stop is positioned
   const exitAccRef  = useRef(0);       // counts scroll events at map edges before releasing page
+  const passElsRef  = useRef([]);      // DOM refs for the 5 pass marker overlays
 
   // React state: content + opacity only. left/top set via DOM refs (never in JSX style).
   const [activeStop, setActiveStop]   = useState(null);
@@ -976,6 +986,20 @@ function ZanskarMapSection({ color }) {
     if (dotRef.current)   { dotRef.current.style.left   = vx + "px"; dotRef.current.style.top   = vy + "px"; }
     if (labelRef.current) { labelRef.current.style.left = vx + "px"; labelRef.current.style.top = (vy + 14) + "px"; }
     if (cardRef.current)  { cardRef.current.style.left  = cx + "px"; cardRef.current.style.top  = cy + "px"; cardRef.current.style.width = cardW + "px"; }
+
+    // Position + light-up pass markers based on whether route has reached each pass
+    ZANSKAR_PASSES.forEach((pass, pi) => {
+      const el = passElsRef.current[pi];
+      if (!el) return;
+      const ppx = lmapRef.current.latLngToContainerPoint([pass.lat, pass.lng]);
+      el.style.left    = (rect.left + ppx.x) + "px";
+      el.style.top     = (rect.top  + ppx.y) + "px";
+      const crossed        = stop.gpxIdx >= pass.gpxIdx;
+      el.style.opacity     = crossed ? "1" : "0.28";
+      el.style.filter      = crossed ? "none" : "grayscale(1)";
+      el.style.transform   = crossed ? "translate(-50%,-100%) scale(1)" : "translate(-50%,-100%) scale(0.82)";
+      el.style.animation   = crossed ? "passBob 3s ease-in-out infinite" : "none";
+    });
 
     setActiveStop(stop);
     setCardVisible(true);
@@ -1128,6 +1152,7 @@ function ZanskarMapSection({ color }) {
       <style>{`
         @keyframes mapBob{0%{transform:rotate(45deg) translateY(-2px)}100%{transform:rotate(45deg) translateY(3px)}}
         @keyframes dotPulse{0%,100%{box-shadow:0 0 0 5px ${color}33,0 0 18px ${color}99}50%{box-shadow:0 0 0 9px ${color}1a,0 0 30px ${color}66}}
+        @keyframes passBob{0%,100%{transform:translate(-50%,-100%) scale(1) translateY(0px)}50%{transform:translate(-50%,-100%) scale(1) translateY(-3px)}}
       `}</style>
 
       {/* Wrapper — 100svh (mobile-safe); wheel events trapped while navigating stops */}
@@ -1219,6 +1244,43 @@ function ZanskarMapSection({ color }) {
             </>
           )}
         </div>
+
+        {/* ⛰ Pass markers — position:fixed, lit when route has crossed them */}
+        {ZANSKAR_PASSES.map((pass, pi) => (
+          <div
+            key={pass.name}
+            ref={el => { passElsRef.current[pi] = el; }}
+            style={{
+              position: "fixed", zIndex: 9900,
+              pointerEvents: "none",
+              transform: "translate(-50%,-100%) scale(0.82)",
+              transition: "left .45s cubic-bezier(.4,0,.2,1), top .45s cubic-bezier(.4,0,.2,1), opacity .5s, transform .4s, filter .5s",
+              opacity: 0,
+              display: "flex", flexDirection: "column", alignItems: "center", gap: 0,
+            }}
+          >
+            {/* Pin label */}
+            <div style={{
+              background: "rgba(10,12,22,0.82)",
+              border: "1px solid rgba(255,255,255,0.22)",
+              borderRadius: 7,
+              padding: "4px 7px 3px",
+              backdropFilter: "blur(6px)",
+              display: "flex", alignItems: "center", gap: 5,
+              boxShadow: "0 3px 12px rgba(0,0,0,0.7)",
+            }}>
+              <span style={{ fontSize: 13, lineHeight: 1 }}>⛰️</span>
+              <div>
+                <div style={{ fontSize: 9, fontWeight: 800, color: "#e2e8f0", lineHeight: 1.3, whiteSpace: "nowrap", letterSpacing: ".02em" }}>{pass.name}</div>
+                <div style={{ fontSize: 8, color: "#94a3b8", lineHeight: 1.2, letterSpacing: ".04em" }}>{pass.alt}</div>
+              </div>
+            </div>
+            {/* Stem */}
+            <div style={{ width: 1.5, height: 7, background: "rgba(255,255,255,0.35)" }} />
+            {/* Dot */}
+            <div style={{ width: 5, height: 5, borderRadius: "50%", background: "#fff", boxShadow: "0 0 4px #fff8" }} />
+          </div>
+        ))}
 
         {/* ‹ Prev / Next › buttons — visible on all screens, essential on mobile */}
         {(() => {
