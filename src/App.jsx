@@ -1011,9 +1011,7 @@ function ZanskarMapSection({ color }) {
         doubleClickZoom: false, touchZoom: false, keyboard: false,
         preferCanvas: true, // Canvas renderer — far faster for large polylines
       });
-      // dark_nolabels (no graticule lines) + dark_only_labels stacked
-      L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}",      { maxZoom: 16, attribution: "" }).addTo(m);
-      L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}", { maxZoom: 16, attribution: "" }).addTo(m);
+      // No tile layers — pure dark canvas, zero flicker, zero grid lines
 
       // Fit to the full route — map never moves after this, tiles load once
       m.fitBounds(L.polyline(ZANSKAR_GPX).getBounds(), { padding: [60, 60] });
@@ -1043,6 +1041,11 @@ function ZanskarMapSection({ color }) {
         link.id = "leaflet-css"; link.rel = "stylesheet";
         link.href = "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css";
         document.head.appendChild(link);
+        // Make Leaflet container transparent so our dark bg shows through
+        const s = document.createElement("style");
+        s.id = "leaflet-bg-override";
+        s.textContent = ".leaflet-container { background: transparent !important; }";
+        document.head.appendChild(s);
       }
       const script = document.createElement("script");
       script.src = "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js";
@@ -1131,7 +1134,7 @@ function ZanskarMapSection({ color }) {
       <div ref={wrapRef} style={{ position: "relative", height: "100svh", overflow: "hidden", background: "#0b0e15" }}>
 
         {/* Leaflet map */}
-        <div ref={mapElRef} style={{ width: "100%", height: "100%" }} />
+        <div ref={mapElRef} style={{ width: "100%", height: "100%", background: "#0d1117" }} />
 
         {/* Glowing dot — position:fixed escapes Leaflet's stacking context.
             left/top set via ref using viewport coords from getBoundingClientRect */}
