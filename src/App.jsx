@@ -923,17 +923,18 @@ const ROUTE_SLICES = ZANSKAR_MAP_STOPS.map(s => ZANSKAR_GPX.slice(0, s.gpxIdx + 
 
 // ─── ZANSKAR MAP SECTION ──────────────────────────────────────────────────────
 function ZanskarMapSection({ color }) {
-  const wrapRef    = useRef(null);
-  const mapElRef   = useRef(null);
-  const lmapRef    = useRef(null);
-  const routeRef   = useRef(null);
-  const dotRef     = useRef(null);
-  const labelRef   = useRef(null);
-  const cardRef    = useRef(null);
-  const stopIdxRef = useRef(0);
-  const wheelAccRef= useRef(0);
-  const inViewRef  = useRef(false);
-  const txRef      = useRef(0); // touch start X
+  const wrapRef     = useRef(null);
+  const mapElRef    = useRef(null);
+  const lmapRef     = useRef(null);
+  const routeRef    = useRef(null);
+  const dotRef      = useRef(null);
+  const labelRef    = useRef(null);
+  const cardRef     = useRef(null);
+  const stopIdxRef  = useRef(0);
+  const wheelAccRef = useRef(0);
+  const inViewRef   = useRef(false);
+  const txRef       = useRef(0);       // touch start X
+  const moveEndRef  = useRef(null);    // cleanup handle for flyTo moveend listener
 
   // React state: content + opacity only. left/top set via DOM refs (never in JSX style).
   const [activeStop, setActiveStop]   = useState(null);
@@ -942,54 +943,63 @@ function ZanskarMapSection({ color }) {
 
   const basePath = `${import.meta.env.BASE_URL}images/zanskar-2025/`;
 
-  // useCallback([]) — created ONCE. All mutable values accessed via refs.
-  // This avoids stale-closure bugs with React StrictMode double-invoke.
+  // FPV updateForStop — flyTo animates the map camera to each stop.
+  // Overlays (dot/label/card) are position:fixed so they must use
+  // viewport-absolute coords via getBoundingClientRect(). They are
+  // hidden during the flight and revealed on moveend.
   const updateForStop = useCallback((si) => {
     const L = window.L;
-    console.log("[ZMap] updateForStop", si, {
-      L: !!L, map: !!lmapRef.current,
-      el: !!mapElRef.current, route: !!routeRef.current,
-    });
     if (!L || !lmapRef.current || !mapElRef.current || !routeRef.current) return;
     const stop = ZANSKAR_MAP_STOPS[si];
     if (!stop) return;
 
-    try { routeRef.current.setLatLngs(ROUTE_SLICES[si]); }
-    catch (e) { console.error("[ZMap] setLatLngs error:", e); }
+    // Draw route up to this stop
+    try { routeRef.current.setLatLngs(ROUTE_SLICES[si]); } catch(_) {}
 
-    const px   = lmapRef.current.latLngToContainerPoint([stop.lat, stop.lng]);
-    const mapW = mapElRef.current.offsetWidth;
-    const mapH = mapElRef.current.offsetHeight;
-    console.log("[ZMap] px:", { x: px.x, y: px.y }, "mapSize:", mapW, "×", mapH);
+    // Hide overlays while the camera is flying
+    setCardVisible(false);
 
-    const isMobile = mapW < 640;
-    const cardW    = isMobile ? Math.min(270, mapW - 24) : 300;
-    const GAP      = 18;
-    const onLeft   = !isMobile && px.x > mapW / 2;
-    const cx = isMobile
-      ? Math.max(8, Math.min(mapW - cardW - 8, px.x - cardW / 2))
-      : onLeft ? px.x - GAP - cardW : px.x + GAP;
-    const cy = Math.min(Math.max(px.y - 100, 8), mapH - 280);
-
-    // left/top NOT in JSX style → React reconciler never resets them
-    if (dotRef.current) {
-      dotRef.current.style.left = px.x + "px";
-      dotRef.current.style.top  = px.y + "px";
-    }
-    if (labelRef.current) {
-      labelRef.current.style.left = px.x + "px";
-      labelRef.current.style.top  = (px.y + 14) + "px";
-    }
-    if (cardRef.current) {
-      cardRef.current.style.left  = cx + "px";
-      cardRef.current.style.top   = cy + "px";
-      cardRef.current.style.width = cardW + "px";
-      console.log("[ZMap] card positioned at", { cx, cy, cardW });
+    // Remove any stale moveend listener from a previous rapid navigation
+    if (moveEndRef.current) {
+      lmapRef.current.off('moveend', moveEndRef.current);
+      moveEndRef.current = null;
     }
 
-    setActiveStop(stop);
-    setCardVisible(true);
-    console.log("[ZMap] setCardVisible(true) — render should follow");
+    // Called once the map has settled at the new position
+    const onMoveEnd = () => {
+      moveEndRef.current = null;
+      if (!lmapRef.current || !mapElRef.current) return;
+
+      // Container-local → viewport-absolute (needed for position:fixed overlays)
+      const px   = lmapRef.current.latLngToContainerPoint([stop.lat, stop.lng]);
+      const rect = mapElRef.current.getBoundingClientRect();
+      const mapW = rect.width;
+      const mapH = rect.height;
+      const vx   = rect.left + px.x;
+      const vy   = rect.top  + px.y;
+
+      const isMobile = mapW < 640;
+      const cardW    = isMobile ? Math.min(270, mapW - 24) : 300;
+      const GAP      = 18;
+      const onLeft   = !isMobile && px.x > mapW / 2;
+      const cx = isMobile
+        ? rect.left + Math.max(8, Math.min(mapW - cardW - 8, px.x - cardW / 2))
+        : onLeft ? vx - GAP - cardW : vx + GAP;
+      const cy = Math.min(Math.max(vy - 100, rect.top + 8), rect.top + mapH - 280);
+
+      if (dotRef.current)   { dotRef.current.style.left   = vx + "px"; dotRef.current.style.top   = vy + "px"; }
+      if (labelRef.current) { labelRef.current.style.left = vx + "px"; labelRef.current.style.top = (vy + 14) + "px"; }
+      if (cardRef.current)  { cardRef.current.style.left  = cx + "px"; cardRef.current.style.top  = cy + "px"; cardRef.current.style.width = cardW + "px"; }
+
+      setActiveStop(stop);
+      setCardVisible(true);
+    };
+
+    moveEndRef.current = onMoveEnd;
+    lmapRef.current.once('moveend', onMoveEnd);
+
+    // FPV camera: fly to this stop at zoom 9
+    lmapRef.current.flyTo([stop.lat, stop.lng], 9, { duration: 0.8, easeLinearity: 0.5 });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Map init ──────────────────────────────────────────────────────────────
@@ -1006,10 +1016,9 @@ function ZanskarMapSection({ color }) {
     function initMap() {
       if (!mapElRef.current) return;
       const L = window.L;
-      console.log("[ZMap] initMap — map already exists?", !!lmapRef.current);
 
       if (lmapRef.current) {
-        // StrictMode re-invoke: map already created, just re-trigger
+        // StrictMode second-invoke: map already created, just re-trigger
         lmapRef.current.invalidateSize();
         go();
         return;
@@ -1020,12 +1029,18 @@ function ZanskarMapSection({ color }) {
         dragging: false, scrollWheelZoom: false,
         doubleClickZoom: false, touchZoom: false, keyboard: false,
       });
-      // dark_nolabels = basemap without graticule lines; dark_only_labels = place names on top
-      L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png",  { maxZoom: 19 }).addTo(m);
+      // dark_nolabels (no graticule grid lines) + dark_only_labels (place names) stacked
+      L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png",    { maxZoom: 19 }).addTo(m);
       L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png", { maxZoom: 19 }).addTo(m);
-      m.fitBounds(L.polyline(ZANSKAR_GPX).getBounds(), { padding: [55, 55] });
-      L.polyline(ZANSKAR_GPX, { color, weight: 2, opacity: 0.18, dashArray: "5,4" }).addTo(m);
+
+      // Start with a wide overview — flyTo will zoom in to the first stop
+      m.setView([33.5, 76.5], 6);
+
+      // Ghost route (full circuit, faint) + animated progress route
+      L.polyline(ZANSKAR_GPX, { color, weight: 2, opacity: 0.15, dashArray: "5,4" }).addTo(m);
       routeRef.current = L.polyline([], { color, weight: 3.5, opacity: 0.9 }).addTo(m);
+
+      // Waypoint markers for all stops
       ZANSKAR_MAP_STOPS.forEach((s, i) => {
         const isEnd = i === 0 || i === ZANSKAR_MAP_STOPS.length - 1;
         L.circleMarker([s.lat, s.lng], {
@@ -1033,8 +1048,8 @@ function ZanskarMapSection({ color }) {
           fillColor: isEnd ? "#e11d48" : color, fillOpacity: 1,
         }).addTo(m);
       });
+
       lmapRef.current = m;
-      console.log("[ZMap] Leaflet map created ✓");
       go();
     }
 
@@ -1053,7 +1068,12 @@ function ZanskarMapSection({ color }) {
       document.head.appendChild(script);
     }
 
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+      if (moveEndRef.current && lmapRef.current) {
+        lmapRef.current.off('moveend', moveEndRef.current);
+      }
+    };
   }, [updateForStop]);
 
   // ── Wheel (desktop) + touch (mobile) navigation ───────────────────────────
